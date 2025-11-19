@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequence Diagram Generator (Mermaid)</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <h1>Sequence Diagram Generator</h1>
+    <p>Create sequence diagrams using Mermaid.js. <a href="help.html" target="_blank" style="margin-left: 10px; font-size: 0.9em;">Need Help?</a></p>
+
+    <div class="container split-container">
+        <div id="editor-pane" class="split">
+            <div class="editor-container">
+                <label for="mermaid-input">Mermaid Code:</label>
+                <div class="editor-wrapper">
+                    <div id="line-numbers"></div>
+                    <textarea id="mermaid-input" rows="15">
+---
+title: Hello Sequence
+---
+sequenceDiagram
+    participant Alice
+    participant Bob
+    Alice->>John: Hello John, how are you?
+    loop Healthcheck
+        John->>John: Fight against hypochondria
+    end
+    Note right of John: Rational thoughts<br/>prevail...
+    John-->>Alice: Great!
+    John->>Bob: How about you?
+    Bob-->>John: Jolly good!
+</textarea>
+                </div>
+                <div class="button-group">
+                    <button id="copy-url-btn">Copy Share URL</button>
+                    <button id="save-txt-btn">Save TXT</button>
+                    <button id="load-txt-btn">Load TXT</button>
+                    <input type="file" id="load-txt-input" accept=".txt,.mmd" style="display: none;">
+                    <button id="download-png-btn">Download PNG</button>
+                    <button id="download-jpg-btn">Download JPG</button>
+                </div>
+            </div>
+        </div>
+        <div id="diagram-pane" class="split">
+            <div class="diagram-container">
+                <div id="mermaid-diagram"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast-notification"></div>
+
+    <script src="https://unpkg.com/split.js/dist/split.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.1/dist/svg-pan-zoom.min.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>
