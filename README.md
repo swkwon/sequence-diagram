@@ -20,10 +20,6 @@ A modern, web-based tool for creating beautiful diagrams using [Mermaid.js](http
 - **Zoom & Pan**: Navigate large diagrams with mouse controls or zoom buttons
 - **Background Patterns**: Toggle between dot and grid patterns for better visualization
 
-### Error Handling & Feedback
-- **Detailed Error Messages**: Clear syntax error reporting in the preview area
-- **Visual Feedback**: Toast notifications for all actions
-
 ### Save & Share
 - **Auto-Save**: Automatic local storage backup (1-hour expiration)
 - **Shareable URLs**: Generate encoded URLs to share diagrams

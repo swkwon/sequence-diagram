@@ -454,6 +454,18 @@ textarea {
     border-bottom: none;
 }
 
+/* Mermaid 에러 요소 숨김 */
+.error-icon,
+.error-text {
+    display: none !important;
+}
+
+/* CodeMirror 에러 라인 표시 */
+.CodeMirror .error-line {
+    background-color: rgba(255, 0, 0, 0.1);
+    border-bottom: 2px dotted #ff0000;
+}
+
 .help-section h2 {
     margin-top: 0;
     color: #333;

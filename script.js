@@ -289,6 +289,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     mermaid.initialize({ 
         startOnLoad: false,
         securityLevel: 'strict',
+        suppressErrors: true,
         flowchart: { 
             htmlLabels: false,
             useMaxWidth: false
@@ -604,11 +605,29 @@ radar-beta
     };
 
     const renderDiagram = async () => {
+        const mermaidTemp = document.getElementById('mermaid-temp');
+        
         try {
-            mermaidDiagram.innerHTML = ''; // Clear existing diagram
             const mermaidCode = editor.getValue();
-            const { svg } = await mermaid.render('graphDiv', mermaidCode);
-            mermaidDiagram.innerHTML = svg;
+            
+            // 먼저 parse로 유효성 검사 (DOM 삽입 방지)
+            const parseResult = await mermaid.parse(mermaidCode);
+            if (!parseResult) {
+                // parse 실패 시 차트 유지
+                return;
+            }
+            
+            const uniqueId = 'graphDiv-' + Date.now();
+            
+            // 임시 컨테이너에 먼저 렌더링 시도
+            mermaidTemp.innerHTML = '';
+            const result = await mermaid.render(uniqueId, mermaidCode);
+            
+            // 성공했을 때만 실제 다이어그램 영역 업데이트
+            mermaidDiagram.innerHTML = result.svg;
+            
+            // 에러 마커 제거 (성공 시)
+            editor.getAllMarks().forEach(mark => mark.clear());
 
             // Initialize SVG Pan Zoom
             const svgElement = mermaidDiagram.querySelector('svg');
@@ -648,9 +667,72 @@ radar-beta
                 });
             }
         } catch (e) {
-            console.error(e);
-            mermaidDiagram.innerHTML = '';
-            mermaidDiagram.appendChild(createErrorDisplay(e.message || String(e)));
+            // parse 실패 또는 render 실패 시 차트 유지
+            mermaidTemp.innerHTML = '';
+            
+            // Frontmatter 줄 수 계산
+            const mermaidCode = editor.getValue();
+            const lines = mermaidCode.split('\n');
+            let frontmatterLines = 0;
+            
+            // Frontmatter 감지: 첫 줄이 ---로 시작하면
+            if (lines[0] && lines[0].trim() === '---') {
+                // 두 번째 ---를 찾아서 frontmatter 줄 수 계산
+                for (let i = 1; i < lines.length; i++) {
+                    frontmatterLines++;
+                    if (lines[i] && lines[i].trim() === '---') {
+                        frontmatterLines++; // 마지막 --- 포함
+                        break;
+                    }
+                }
+            }
+            
+            console.log('Frontmatter lines detected:', frontmatterLines);
+            
+            // 에러 메시지에서 줄 번호 추출 (다양한 패턴 지원)
+            const errorMessage = e.message || e.str || String(e);
+            let errorLine = null;
+            
+            // 패턴 1: "Parse error on line 15"
+            let lineMatch = errorMessage.match(/line[\s:]+(\d+)/i);
+            if (lineMatch) {
+                errorLine = parseInt(lineMatch[1], 10) - 1 + frontmatterLines;
+            }
+            
+            // 패턴 2: e.hash.line (파서 에러 객체)
+            if (e.hash && e.hash.line !== undefined) {
+                errorLine = e.hash.line - 1 + frontmatterLines;
+            }
+            
+            // 패턴 3: e.hash.loc.first_line
+            if (e.hash && e.hash.loc && e.hash.loc.first_line !== undefined) {
+                errorLine = e.hash.loc.first_line - 1 + frontmatterLines;
+            }
+            
+            console.log('Detected error line (before adjustment):', errorLine - frontmatterLines);
+            console.log('Adjusted error line (with frontmatter):', errorLine);
+            
+            if (errorLine !== null && errorLine >= 0) {
+                const lineLength = editor.getLine(errorLine)?.length || 0;
+                
+                // 기존 마커 제거
+                editor.getAllMarks().forEach(mark => mark.clear());
+                
+                // 에러 라인에 빨간색 밑줄 표시
+                if (errorLine < editor.lineCount()) {
+                    editor.markText(
+                        { line: errorLine, ch: 0 },
+                        { line: errorLine, ch: lineLength },
+                        { 
+                            className: 'error-line',
+                            title: errorMessage
+                        }
+                    );
+                    
+                    // 에러 라인으로 스크롤
+                    editor.scrollIntoView({ line: errorLine, ch: 0 }, 100);
+                }
+            }
         }
     };
 
