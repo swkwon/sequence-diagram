@@ -29,6 +29,7 @@ A modern, web-based tool for creating beautiful diagrams using [Mermaid.js](http
 - **Export Options**: Download as high-quality PNG or JPG images
 
 ### UI & Design
+- **Full-Screen Layout**: Edge-to-edge design that maximizes workspace
 - **Modern Interface**: Clean, gradient-based design with animated header
 - **Responsive Layout**: Works on desktop and mobile devices
 - **Sample Library**: 23 built-in diagram examples (flowchart, sequence, gantt, etc.)

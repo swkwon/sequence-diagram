@@ -13,20 +13,19 @@ body {
     background: rgba(255, 255, 255, 0.98);
     backdrop-filter: blur(10px);
     padding: 20px;
-    margin-bottom: 20px;
     border-bottom: 3px solid transparent;
     border-image: linear-gradient(90deg, #56ab2f 0%, #a8e063 100%);
     border-image-slice: 1;
 }
 
 .header-content {
-    max-width: 1800px;
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
     align-items: center;
     gap: 20px;
     flex-wrap: wrap;
+    padding: 0 20px;
 }
 
 .logo {
@@ -115,14 +114,6 @@ body {
     }
 }
 
-.container {
-    /* display: flex; */ /* Handled by split.js, so commented out or removed */
-    gap: 20px;
-    max-width: 1800px;
-    margin: 0 auto;
-    padding: 0 20px;
-}
-
 .split-container {
     display: flex;
     height: calc(100vh - 150px); /* Viewport height minus header height, etc. */
@@ -155,8 +146,6 @@ body {
     /* flex: 1; */
     padding: 20px;
     background-color: #fff;
-    border-radius: 5px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.1);
     box-sizing: border-box; /* Calculate size including padding */
     display: flex;
     flex-direction: column;
