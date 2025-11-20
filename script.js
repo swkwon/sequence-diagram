@@ -1,8 +1,274 @@
+// Constants
+const CONFIG = {
+    SPLIT_SIZES_KEY: 'split-sizes',
+    MERMAID_CODE_KEY: 'mermaid-code',
+    BACKGROUND_PATTERN_KEY: 'background-pattern',
+    AUTOSAVE_TTL: 60 * 60 * 1000, // 1 hour
+    DEBOUNCE_DELAY: 300,
+    RESIZE_DEBOUNCE: 300,
+    TOAST_DURATION: 3000,
+    PADDING: 20,
+    LOAD_TIMEOUT: 10000,
+    MAX_DIMENSION: 16384,
+    DEFAULT_SPLIT_SIZES: [50, 50],
+    MESSAGES: {
+        URL_COPIED: 'Share URL copied to clipboard!',
+        URL_COPY_FAILED: 'Failed to copy URL.',
+        FILE_SAVED: 'File saved successfully!',
+        FILE_SAVE_FAILED: 'Failed to save file.',
+        FILE_LOADED: 'File loaded successfully!',
+        FILE_LOAD_FAILED: 'Failed to read file.',
+        NO_DIAGRAM: 'No diagram to download.',
+        DIAGRAM_TOO_LARGE: 'Diagram size is too large to export.',
+        IMAGE_TIMEOUT: 'Image loading timeout. Please try a simpler diagram.',
+        INVALID_DIMENSIONS: 'Invalid diagram dimensions. Please try regenerating the diagram.',
+        IMAGE_NOT_LOADED: 'Image not fully loaded. Please try again.',
+        CANVAS_FAILED: 'Failed to create canvas context.',
+        EXPORT_FAILED: 'Failed to export image. Browser security policy blocked the export.',
+        EXPORT_EMPTY: 'Failed to generate image. Please try a smaller or simpler diagram.',
+        EXPORT_ERROR: 'Failed to export image. Some diagram features may not be compatible.',
+        IMAGE_LOAD_ERROR: 'Failed to load image. The SVG may contain unsupported features.',
+        URL_DECODE_FAILED: 'Failed to load code from URL.',
+        ENCODE_FAILED: 'Failed to encode diagram. Please try a different diagram type.'
+    }
+};
+
+// Utility Functions
+const debounce = (func, delay) => {
+    let timeoutId;
+    return (...args) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => func.apply(this, args), delay);
+    };
+};
+
+const collectCssStyles = () => {
+    return Array.from(document.styleSheets)
+        .filter(sheet => !sheet.href)
+        .flatMap(sheet => {
+            try {
+                return Array.from(sheet.cssRules || sheet.rules)
+                    .map(rule => rule.cssText)
+                    .filter(cssText => !/url\s*\((?!['"]?(?:data:|#))/i.test(cssText));
+            } catch (e) {
+                console.warn('Cannot access stylesheet:', e);
+                return [];
+            }
+        })
+        .join('\n');
+};
+
+const getSvgDimensions = (svgElement) => {
+    const viewport = svgElement.querySelector('.svg-pan-zoom_viewport');
+    return viewport ? viewport.getBBox() : 
+           (svgElement.viewBox?.baseVal?.width > 0 ? svgElement.viewBox.baseVal : svgElement.getBBox());
+};
+
+const createErrorDisplay = (errorMessage) => {
+    const errorDiv = document.createElement('div');
+    Object.assign(errorDiv.style, {
+        color: '#721c24',
+        backgroundColor: '#f8d7da',
+        border: '1px solid #f5c6cb',
+        padding: '15px',
+        borderRadius: '4px',
+        textAlign: 'left',
+        overflow: 'auto'
+    });
+
+    const title = document.createElement('div');
+    title.style.fontWeight = 'bold';
+    title.style.marginBottom = '10px';
+    title.textContent = 'Diagram Syntax Error:';
+    errorDiv.appendChild(title);
+
+    const pre = document.createElement('pre');
+    Object.assign(pre.style, {
+        margin: '0',
+        whiteSpace: 'pre-wrap',
+        fontFamily: 'monospace',
+        fontSize: '14px'
+    });
+    pre.textContent = errorMessage;
+    errorDiv.appendChild(pre);
+
+    return errorDiv;
+};
+
+const prepareSvgForExport = (svgElement) => {
+    const clonedSvg = svgElement.cloneNode(true);
+    
+    // Inject styles
+    const styleElement = document.createElement('style');
+    styleElement.textContent = collectCssStyles();
+    clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
+    
+    // Remove svg-pan-zoom transformations
+    const clonedViewport = clonedSvg.querySelector('.svg-pan-zoom_viewport');
+    if (clonedViewport) {
+        clonedViewport.removeAttribute('transform');
+        clonedViewport.removeAttribute('style');
+    }
+    
+    return clonedSvg;
+};
+
+const convertSvgToImage = (svgElement, bbox, format, onSuccess, onError) => {
+    const { width, height, x, y } = bbox;
+    const clonedSvg = prepareSvgForExport(svgElement);
+    
+    console.log('Export size:', { 
+        width, 
+        height,
+        aspectRatio: (width / height).toFixed(2)
+    });
+    
+    // Set SVG attributes
+    Object.assign(clonedSvg.style, { width: '', height: '', maxWidth: '' });
+    clonedSvg.setAttribute('width', width);
+    clonedSvg.setAttribute('height', height);
+    clonedSvg.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
+    
+    // Serialize and encode
+    const svgXML = new XMLSerializer().serializeToString(clonedSvg).replace(/\0/g, '');
+    
+    let svgDataUrl;
+    try {
+        svgDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgXML)));
+    } catch (e) {
+        console.error('SVG encoding error:', e);
+        onError(CONFIG.MESSAGES.ENCODE_FAILED);
+        return;
+    }
+    
+    // Convert to image
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    const loadTimeout = setTimeout(() => {
+        console.error('Image loading timeout');
+        onError(CONFIG.MESSAGES.IMAGE_TIMEOUT);
+    }, CONFIG.LOAD_TIMEOUT);
+    
+    img.onload = () => {
+        clearTimeout(loadTimeout);
+        
+        try {
+            console.log('Image loaded successfully!');
+            console.log('Image natural dimensions:', img.naturalWidth, 'x', img.naturalHeight);
+            console.log('Expected dimensions:', width, 'x', height);
+
+            if (width <= 0 || height <= 0) {
+                console.error('Invalid dimensions:', { width, height });
+                onError(CONFIG.MESSAGES.INVALID_DIMENSIONS);
+                return;
+            }
+
+            if (!img.complete || img.naturalWidth === 0) {
+                console.error('Image not fully loaded:', { complete: img.complete, naturalWidth: img.naturalWidth });
+                onError(CONFIG.MESSAGES.IMAGE_NOT_LOADED);
+                return;
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width + CONFIG.PADDING * 2;
+            canvas.height = height + CONFIG.PADDING * 2;
+
+            console.log('Canvas created with size:', canvas.width, 'x', canvas.height);
+
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+                console.error('Failed to get canvas context');
+                onError(CONFIG.MESSAGES.CANVAS_FAILED);
+                return;
+            }
+            
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            console.log('White background filled');
+            
+            console.log('Drawing image at:', CONFIG.PADDING, CONFIG.PADDING, 'with size:', width, height);
+            ctx.drawImage(img, CONFIG.PADDING, CONFIG.PADDING, width, height);
+            console.log('Image drawn successfully');
+
+            const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
+            let dataUrl;
+            try {
+                dataUrl = canvas.toDataURL(mimeType);
+            } catch (e) {
+                console.error('Canvas to data URL error:', e);
+                onError(CONFIG.MESSAGES.EXPORT_FAILED);
+                return;
+            }
+            
+            if (!dataUrl || dataUrl === 'data:,' || dataUrl.length < 100) {
+                console.error('Generated data URL is empty or invalid');
+                console.log('Canvas size:', canvas.width, 'x', canvas.height);
+                console.log('Image size:', img.width, 'x', img.height);
+                console.log('Data URL length:', dataUrl ? dataUrl.length : 0);
+                onError(CONFIG.MESSAGES.EXPORT_EMPTY);
+                return;
+            }
+
+            onSuccess(dataUrl);
+        } catch (e) {
+            console.error('Image conversion error:', e);
+            onError(CONFIG.MESSAGES.EXPORT_ERROR);
+        }
+    };
+    
+    img.onerror = (e) => {
+        clearTimeout(loadTimeout);
+        console.error('Image load error:', e);
+        console.log('SVG Data URL length:', svgDataUrl ? svgDataUrl.length : 0);
+        console.log('SVG XML preview:', svgXML.substring(0, 500));
+        onError(CONFIG.MESSAGES.IMAGE_LOAD_ERROR);
+    };
+    
+    img.src = svgDataUrl;
+};
+
+const saveFile = async (content, filename, mimeType) => {
+    // Check if File System Access API is supported
+    if ('showSaveFilePicker' in window) {
+        try {
+            const handle = await window.showSaveFilePicker({
+                suggestedName: filename,
+                types: [{
+                    description: 'Text Files',
+                    accept: { [mimeType]: ['.txt', '.mmd'] },
+                }],
+            });
+            
+            const writable = await handle.createWritable();
+            await writable.write(content);
+            await writable.close();
+            return true;
+        } catch (err) {
+            if (err.name === 'AbortError') {
+                return false; // User cancelled
+            }
+            throw err;
+        }
+    } else {
+        // Fallback: Traditional download method
+        const blob = new Blob([content], { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return true;
+    }
+};
 
 document.addEventListener('DOMContentLoaded', async () => {
-    // Get saved split sizes (default to [50, 50] if not found)
-    const savedSizes = localStorage.getItem('split-sizes');
-    const initialSizes = savedSizes ? JSON.parse(savedSizes) : [50, 50];
+    // Get saved split sizes
+    const savedSizes = localStorage.getItem(CONFIG.SPLIT_SIZES_KEY);
+    const initialSizes = savedSizes ? JSON.parse(savedSizes) : CONFIG.DEFAULT_SPLIT_SIZES;
 
     // Initialize Split.js
     Split(['#editor-pane', '#diagram-pane'], {
@@ -11,9 +277,7 @@ document.addEventListener('DOMContentLoaded', async () => {
         gutterSize: 10,
         cursor: 'col-resize',
         onDragEnd: (sizes) => {
-            // Save sizes on drag end
-            localStorage.setItem('split-sizes', JSON.stringify(sizes));
-            // Resize panZoom when panel size changes
+            localStorage.setItem(CONFIG.SPLIT_SIZES_KEY, JSON.stringify(sizes));
             if (panZoomInstance) {
                 panZoomInstance.resize();
                 panZoomInstance.fit();
@@ -41,12 +305,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     const loadTxtInput = document.getElementById('load-txt-input');
     const downloadPngBtn = document.getElementById('download-png-btn');
     const downloadJpgBtn = document.getElementById('download-jpg-btn');
+    const toggleBackgroundBtn = document.getElementById('toggle-background-btn');
     const mermaidInput = document.getElementById('mermaid-input');
     const lineNumbers = document.getElementById('line-numbers');
     const mermaidDiagram = document.getElementById('mermaid-diagram');
     const toast = document.getElementById('toast-notification');
     const sampleSelector = document.getElementById('sample-selector');
     let panZoomInstance = null;
+    let currentBackground = localStorage.getItem(CONFIG.BACKGROUND_PATTERN_KEY) || 'dot';
 
     // Sample codes for different diagram types
     const samples = {
@@ -312,23 +578,12 @@ radar-beta
     // Update line numbers on input
     mermaidInput.addEventListener('input', updateLineNumbers);
 
-    // Debounce function: executes the function if there are no further calls for the specified time.
-    const debounce = (func, delay) => {
-        let timeoutId;
-        return (...args) => {
-            clearTimeout(timeoutId);
-            timeoutId = setTimeout(() => {
-                func.apply(this, args);
-            }, delay);
-        };
-    };
-
     const showToast = (message) => {
         toast.textContent = message;
         toast.classList.add('show');
         setTimeout(() => {
             toast.classList.remove('show');
-        }, 3000);
+        }, CONFIG.TOAST_DURATION);
     };
 
     const renderDiagram = async () => {
@@ -378,33 +633,12 @@ radar-beta
         } catch (e) {
             console.error(e);
             mermaidDiagram.innerHTML = '';
-            
-            const errorDiv = document.createElement('div');
-            errorDiv.style.color = '#721c24';
-            errorDiv.style.backgroundColor = '#f8d7da';
-            errorDiv.style.border = '1px solid #f5c6cb';
-            errorDiv.style.padding = '15px';
-            errorDiv.style.borderRadius = '4px';
-            errorDiv.style.textAlign = 'left';
-            errorDiv.style.overflow = 'auto';
-
-            const title = document.createElement('div');
-            title.style.fontWeight = 'bold';
-            title.style.marginBottom = '10px';
-            title.textContent = 'Diagram Syntax Error:';
-            errorDiv.appendChild(title);
-
-            const pre = document.createElement('pre');
-            pre.style.margin = '0';
-            pre.style.whiteSpace = 'pre-wrap';
-            pre.style.fontFamily = 'monospace';
-            pre.style.fontSize = '14px';
-            pre.textContent = e.message || String(e);
-            errorDiv.appendChild(pre);
-
-            mermaidDiagram.appendChild(errorDiv);
+            mermaidDiagram.appendChild(createErrorDisplay(e.message || String(e)));
         }
     };
+
+    // Debounce function: executes the function if there are no further calls for the specified time.
+    const debouncedRender = debounce(renderDiagram, CONFIG.DEBOUNCE_DELAY);
 
     const setMermaidCodeFromUrl = () => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -416,8 +650,8 @@ radar-beta
                 mermaidInput.value = decodedCode;
                 return true;
             } catch (e) {
-                console.error('URL 파라미터 디코딩 오류:', e);
-                showToast('Failed to load code from URL.');
+                console.error('URL parameter decoding error:', e);
+                showToast(CONFIG.MESSAGES.URL_DECODE_FAILED);
             }
         }
         return false;
@@ -430,10 +664,10 @@ radar-beta
         const url = `${window.location.origin}${window.location.pathname}?code=${encodedCode}`;
         
         navigator.clipboard.writeText(url).then(() => {
-            showToast('Share URL copied to clipboard!');
+            showToast(CONFIG.MESSAGES.URL_COPIED);
         }, (err) => {
-            console.error('클립보드 복사 실패:', err);
-            showToast('Failed to copy URL.');
+            console.error('Clipboard copy failed:', err);
+            showToast(CONFIG.MESSAGES.URL_COPY_FAILED);
         });
     });
 
@@ -441,38 +675,14 @@ radar-beta
     saveTxtBtn.addEventListener('click', async () => {
         const text = mermaidInput.value;
         
-        // Check if File System Access API is supported
-        if ('showSaveFilePicker' in window) {
-            try {
-                const handle = await window.showSaveFilePicker({
-                    suggestedName: 'mermaid-diagram.txt',
-                    types: [{
-                        description: 'Text Files',
-                        accept: { 'text/plain': ['.txt', '.mmd'] },
-                    }],
-                });
-                
-                const writable = await handle.createWritable();
-                await writable.write(text);
-                await writable.close();
-                showToast('File saved successfully!');
-            } catch (err) {
-                if (err.name !== 'AbortError') {
-                    console.error('File save error:', err);
-                    showToast('Failed to save file.');
-                }
+        try {
+            const saved = await saveFile(text, 'mermaid-diagram.txt', 'text/plain');
+            if (saved) {
+                showToast(CONFIG.MESSAGES.FILE_SAVED);
             }
-        } else {
-            // Fallback: Traditional download method
-            const blob = new Blob([text], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'mermaid-diagram.txt';
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error('File save error:', err);
+            showToast(CONFIG.MESSAGES.FILE_SAVE_FAILED);
         }
     });
 
@@ -500,12 +710,12 @@ radar-beta
                 code: content,
                 timestamp: Date.now()
             };
-            localStorage.setItem('mermaid-code', JSON.stringify(data));
+            localStorage.setItem(CONFIG.MERMAID_CODE_KEY, JSON.stringify(data));
             
-            showToast('File loaded successfully!');
+            showToast(CONFIG.MESSAGES.FILE_LOADED);
         };
         reader.onerror = () => {
-            showToast('Failed to read file.');
+            showToast(CONFIG.MESSAGES.FILE_LOAD_FAILED);
         };
         reader.readAsText(file);
         
@@ -513,330 +723,72 @@ radar-beta
         loadTxtInput.value = '';
     });
 
-    const downloadSvg = () => {
-        const svgElement = mermaidDiagram.querySelector('svg');
-        if (!svgElement) {
-            showToast('No diagram to download.');
-            return;
-        }
-
-        console.log('=== SVG Download Debug ===');
-
-        // Clone and prepare SVG
-        const clonedSvg = svgElement.cloneNode(true);
-
-        // Remove the "today" line that extends beyond visible area (for Gantt charts)
-        const todayLine = clonedSvg.querySelector('.today line');
-        if (todayLine) {
-            const x1 = parseFloat(todayLine.getAttribute('x1'));
-            if (x1 > 10000) { // If today line is far in the future
-                console.log('Removing today line at x:', x1);
-                todayLine.parentElement.remove();
-            }
-        }
-
-        // Inject styles
-        const cssStyles = Array.from(document.styleSheets)
-            .filter(sheet => !sheet.href)
-            .flatMap(sheet => {
-                try {
-                    return Array.from(sheet.cssRules || sheet.rules)
-                        .map(rule => rule.cssText)
-                        .filter(cssText => !/url\s*\((?!['"]?(?:data:|#))/i.test(cssText));
-                } catch (e) {
-                    console.warn('Cannot access stylesheet:', e);
-                    return [];
-                }
-            })
-            .join('\n');
-        
-        const styleElement = document.createElement('style');
-        styleElement.textContent = cssStyles;
-        clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
-
-        // Get dimensions from ORIGINAL SVG first (before any modifications)
-        const originalViewport = svgElement.querySelector('.svg-pan-zoom_viewport');
-        let bbox;
-        
-        try {
-            // Always get BBox from original SVG to ensure correct dimensions
-            bbox = originalViewport ? originalViewport.getBBox() : svgElement.getBBox();
-            console.log('Got BBox from original SVG:', bbox);
-        } catch (e) {
-            console.warn('getBBox failed, using viewBox:', e);
-            if (svgElement.viewBox && svgElement.viewBox.baseVal && svgElement.viewBox.baseVal.width > 0) {
-                bbox = svgElement.viewBox.baseVal;
-            } else {
-                console.error('Cannot determine SVG dimensions');
-                showToast('Failed to get diagram dimensions.');
-                return;
-            }
-        }
-        
-        let { width, height, x, y } = bbox;
-        
-        // Check if this is a Gantt chart with "today" line that's too far
-        const todayLineInOriginal = svgElement.querySelector('.today line');
-        if (todayLineInOriginal) {
-            const x1 = parseFloat(todayLineInOriginal.getAttribute('x1'));
-            if (x1 > 10000) {
-                // Recalculate dimensions excluding the today line
-                console.log('Today line detected at x:', x1, '- will exclude from dimensions');
-                // Use reasonable bounds instead of the extreme today line
-                width = Math.min(width, 2000); // Cap at reasonable width
-            }
-        }
-
-        // Remove svg-pan-zoom transformations from cloned SVG
-        const clonedViewport = clonedSvg.querySelector('.svg-pan-zoom_viewport');
-        if (clonedViewport) {
-            clonedViewport.removeAttribute('transform');
-            clonedViewport.removeAttribute('style');
-            console.log('Viewport transform removed');
-        }
-        
-        // Add some padding
-        const PADDING = 20;
-        width += PADDING * 2;
-        height += PADDING * 2;
-        x -= PADDING;
-        y -= PADDING;
-        
-        console.log('SVG dimensions (after removing today line):', { width, height, x, y });
-
-        if (width <= 0 || height <= 0) {
-            console.error('Invalid SVG dimensions:', { width, height });
-            showToast('Invalid diagram dimensions.');
-            return;
-        }
-
-        // Set SVG attributes to ensure it's visible
-        clonedSvg.removeAttribute('style');
-        clonedSvg.setAttribute('width', width);
-        clonedSvg.setAttribute('height', height);
-        clonedSvg.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
-        
-        // Add XML namespace if not present
-        if (!clonedSvg.hasAttribute('xmlns')) {
-            clonedSvg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
-        }
-        if (!clonedSvg.hasAttribute('xmlns:xlink')) {
-            clonedSvg.setAttribute('xmlns:xlink', 'http://www.w3.org/1999/xlink');
-        }
-
-        // Serialize and download
-        const svgXML = new XMLSerializer().serializeToString(clonedSvg);
-        
-        console.log('SVG XML length:', svgXML.length);
-        console.log('SVG dimensions set to:', `${width}x${height}`);
-        console.log('ViewBox:', `${x} ${y} ${width} ${height}`);
-        
-        // Add XML declaration
-        const fullSvgXML = '<?xml version="1.0" encoding="UTF-8" standalone="no"?>\n' + svgXML;
-        
-        const blob = new Blob([fullSvgXML], { type: 'image/svg+xml;charset=utf-8' });
-        console.log('Blob size:', blob.size, 'bytes');
-        
-        const url = URL.createObjectURL(blob);
-        
-        const link = document.createElement('a');
-        link.download = 'diagram.svg';
-        link.href = url;
-        link.click();
-        
-        setTimeout(() => {
-            URL.revokeObjectURL(url);
-        }, 100);
-        
-        console.log('SVG download completed');
-        console.log('========================');
-        showToast('SVG downloaded successfully!');
-    };
-
     const downloadDiagram = (format) => {
         const svgElement = mermaidDiagram.querySelector('svg');
         if (!svgElement) {
-            showToast('No diagram to download.');
+            showToast(CONFIG.MESSAGES.NO_DIAGRAM);
             return;
         }
 
-        const PADDING = 20;
-        const LOAD_TIMEOUT = 10000;
-        const MAX_DIMENSION = 16384; // Browser canvas size limit
-
-        // 1. Calculate size and position
-        const originalViewport = svgElement.querySelector('.svg-pan-zoom_viewport');
-        
+        // Calculate size and position
         console.log('SVG element info:', {
             clientWidth: svgElement.clientWidth,
             clientHeight: svgElement.clientHeight,
-            viewBox: svgElement.getAttribute('viewBox'),
-            hasViewport: !!originalViewport
+            viewBox: svgElement.getAttribute('viewBox')
         });
         
-        // Get the actual content size
-        const bbox = originalViewport ? originalViewport.getBBox() : 
-                     (svgElement.viewBox?.baseVal?.width > 0 ? svgElement.viewBox.baseVal : svgElement.getBBox());
-        
+        const bbox = getSvgDimensions(svgElement);
         const { width, height, x, y } = bbox;
         console.log('Using BBox:', { x, y, width, height });
 
         // Check if dimensions exceed browser limits
-        if (width > MAX_DIMENSION || height > MAX_DIMENSION) {
-            console.warn('Diagram too large for PNG/JPG export. Falling back to SVG.');
-            showToast('다이어그램 크기가 너무 커 SVG로 다운로드합니다.');
-            downloadSvg();
+        if (width > CONFIG.MAX_DIMENSION || height > CONFIG.MAX_DIMENSION) {
+            console.warn('Diagram dimensions exceed maximum allowed size:', { width, height });
+            showToast(CONFIG.MESSAGES.DIAGRAM_TOO_LARGE);
             return;
         }
 
-        // 2. Clone and prepare SVG
-        const clonedSvg = svgElement.cloneNode(true);
-
-        // 3. Inject styles
-        const cssStyles = Array.from(document.styleSheets)
-            .filter(sheet => !sheet.href)
-            .flatMap(sheet => {
-                try {
-                    return Array.from(sheet.cssRules || sheet.rules)
-                        .map(rule => rule.cssText)
-                        .filter(cssText => !/url\s*\((?!['"]?(?:data:|#))/i.test(cssText));
-                } catch (e) {
-                    console.warn('Cannot access stylesheet:', e);
-                    return [];
-                }
-            })
-            .join('\n');
-        
-        const styleElement = document.createElement('style');
-        styleElement.textContent = cssStyles;
-        clonedSvg.insertBefore(styleElement, clonedSvg.firstChild);
-
-        // 4. Remove svg-pan-zoom transformations
-        const clonedViewport = clonedSvg.querySelector('.svg-pan-zoom_viewport');
-        if (clonedViewport) {
-            clonedViewport.removeAttribute('transform');
-            clonedViewport.removeAttribute('style');
-        }
-
-        console.log('Export size:', { 
-            width, 
-            height,
-            aspectRatio: (width / height).toFixed(2)
-        });
-        
-        // 5. Set SVG attributes
-        Object.assign(clonedSvg.style, { width: '', height: '', maxWidth: '' });
-        clonedSvg.setAttribute('width', width);
-        clonedSvg.setAttribute('height', height);
-        clonedSvg.setAttribute('viewBox', `${x} ${y} ${width} ${height}`);
-
-        // 6. Serialize and encode
-        const svgXML = new XMLSerializer().serializeToString(clonedSvg).replace(/\0/g, '');
-        
-        let svgDataUrl;
-        try {
-            svgDataUrl = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgXML)));
-        } catch (e) {
-            console.error('SVG encoding error:', e);
-            showToast('Failed to encode diagram. Please try a different diagram type.');
-            return;
-        }
-
-        // 7. Convert to image
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        
-        const loadTimeout = setTimeout(() => {
-            console.error('Image loading timeout');
-            showToast('Image loading timeout. Please try a simpler diagram.');
-        }, LOAD_TIMEOUT);
-        
-        img.onload = () => {
-            clearTimeout(loadTimeout);
-            
-            try {
-                console.log('Image loaded successfully!');
-                console.log('Image natural dimensions:', img.naturalWidth, 'x', img.naturalHeight);
-                console.log('Expected dimensions:', width, 'x', height);
-
-                if (width <= 0 || height <= 0) {
-                    console.error('Invalid dimensions:', { width, height });
-                    showToast('Invalid diagram dimensions. Please try regenerating the diagram.');
-                    return;
-                }
-
-                if (!img.complete || img.naturalWidth === 0) {
-                    console.error('Image not fully loaded:', { complete: img.complete, naturalWidth: img.naturalWidth });
-                    showToast('Image not fully loaded. Please try again.');
-                    return;
-                }
-
-                const canvas = document.createElement('canvas');
-                canvas.width = width + PADDING * 2;
-                canvas.height = height + PADDING * 2;
-
-                console.log('Canvas created with size:', canvas.width, 'x', canvas.height);
-
-                const ctx = canvas.getContext('2d');
-                if (!ctx) {
-                    console.error('Failed to get canvas context');
-                    showToast('Failed to create canvas context.');
-                    return;
-                }
-                
-                ctx.fillStyle = 'white';
-                ctx.fillRect(0, 0, canvas.width, canvas.height);
-                console.log('White background filled');
-                
-                console.log('Drawing image at:', PADDING, PADDING, 'with size:', width, height);
-                ctx.drawImage(img, PADDING, PADDING, width, height);
-                console.log('Image drawn successfully');
-
-                const mimeType = format === 'png' ? 'image/png' : 'image/jpeg';
-                let dataUrl;
-                try {
-                    dataUrl = canvas.toDataURL(mimeType);
-                } catch (e) {
-                    console.error('Canvas to data URL error:', e);
-                    showToast('Failed to export image. Browser security policy blocked the export.');
-                    return;
-                }
-                
-                if (!dataUrl || dataUrl === 'data:,' || dataUrl.length < 100) {
-                    console.error('Generated data URL is empty or invalid');
-                    console.log('Canvas size:', canvas.width, 'x', canvas.height);
-                    console.log('Image size:', img.width, 'x', img.height);
-                    console.log('Data URL length:', dataUrl ? dataUrl.length : 0);
-                    showToast('Failed to generate image. Please try a smaller or simpler diagram.');
-                    return;
-                }
-
+        // Convert SVG to image and download
+        convertSvgToImage(
+            svgElement,
+            bbox,
+            format,
+            (dataUrl) => {
                 const link = document.createElement('a');
                 link.download = `diagram.${format}`;
                 link.href = dataUrl;
                 link.click();
-            } catch (e) {
-                console.error('이미지 변환 오류:', e);
-                showToast('Failed to export image. Some diagram features may not be compatible.');
+            },
+            (errorMessage) => {
+                showToast(errorMessage);
             }
-        };
-        
-        img.onerror = (e) => {
-            clearTimeout(loadTimeout);
-            console.error('이미지 로드 오류:', e);
-            console.log('SVG Data URL length:', svgDataUrl ? svgDataUrl.length : 0);
-            console.log('SVG XML preview:', svgXML.substring(0, 500));
-            showToast('Failed to load image. The SVG may contain unsupported features.');
-        };
-        
-        img.src = svgDataUrl;
+        );
     };
 
     downloadPngBtn.addEventListener('click', () => downloadDiagram('png'));
     downloadJpgBtn.addEventListener('click', () => downloadDiagram('jpg'));
 
-    // Render function with 300ms debounce
-    const debouncedRender = debounce(renderDiagram, 300);
+    // Background pattern toggle
+    const applyBackground = (pattern) => {
+        if (pattern === 'dot') {
+            mermaidDiagram.style.backgroundImage = 'radial-gradient(circle, #d0d0d0 1px, transparent 1px)';
+            mermaidDiagram.style.backgroundSize = '20px 20px';
+            toggleBackgroundBtn.querySelector('span').textContent = 'Grid';
+        } else {
+            mermaidDiagram.style.backgroundImage = 'linear-gradient(#e0e0e0 1px, transparent 1px), linear-gradient(90deg, #e0e0e0 1px, transparent 1px)';
+            mermaidDiagram.style.backgroundSize = '20px 20px';
+            toggleBackgroundBtn.querySelector('span').textContent = 'Dot';
+        }
+    };
+
+    toggleBackgroundBtn.addEventListener('click', () => {
+        currentBackground = currentBackground === 'dot' ? 'grid' : 'dot';
+        localStorage.setItem(CONFIG.BACKGROUND_PATTERN_KEY, currentBackground);
+        applyBackground(currentBackground);
+    });
+
+    // Apply saved background pattern
+    applyBackground(currentBackground);
 
     // Auto-save and call debounced render function on text input
     mermaidInput.addEventListener('input', () => {
@@ -844,7 +796,7 @@ radar-beta
             code: mermaidInput.value,
             timestamp: Date.now()
         };
-        localStorage.setItem('mermaid-code', JSON.stringify(data));
+        localStorage.setItem(CONFIG.MERMAID_CODE_KEY, JSON.stringify(data));
         debouncedRender();
     });
 
@@ -852,18 +804,18 @@ radar-beta
     const loadedFromUrl = setMermaidCodeFromUrl();
     
     if (!loadedFromUrl) {
-        const savedData = localStorage.getItem('mermaid-code');
+        const savedData = localStorage.getItem(CONFIG.MERMAID_CODE_KEY);
         if (savedData) {
             try {
                 const parsedData = JSON.parse(savedData);
-                const oneHour = 60 * 60 * 1000; // 1 hour (milliseconds)
+                const oneHour = CONFIG.AUTOSAVE_TTL;
 
                 if (parsedData && parsedData.timestamp && parsedData.code) {
                     if (Date.now() - parsedData.timestamp < oneHour) {
                         mermaidInput.value = parsedData.code;
                     } else {
                         console.log('Auto-saved code expired.');
-                        localStorage.removeItem('mermaid-code');
+                        localStorage.removeItem(CONFIG.MERMAID_CODE_KEY);
                     }
                 }
             } catch (e) {
@@ -887,7 +839,7 @@ radar-beta
                 panZoomInstance.fit();
                 panZoomInstance.center();
             }
-        }, 300);
+        }, CONFIG.RESIZE_DEBOUNCE);
     });
 });
 

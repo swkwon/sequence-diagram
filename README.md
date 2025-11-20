@@ -1,44 +1,114 @@
 # Mermaid Editor
 
-A web-based tool for creating diagrams using [Mermaid.js](https://mermaid.js.org/).
+A modern, web-based tool for creating beautiful diagrams using [Mermaid.js](https://mermaid.js.org/).
 
-## Features
+## ✨ Features
 
-- **Real-time Rendering**: The diagram updates automatically as you type.
-- **Enhanced Editor**: Code editor with **line numbers** for better readability and navigation.
-- **Detailed Error Reporting**: Clear and specific error messages are displayed directly in the preview area when syntax errors occur.
-- **Auto-Save**: Your work is automatically saved to your browser's local storage (expires after 1 hour), so you won't lose progress if you accidentally close the tab.
-- **Zoom & Pan**: Easily navigate large diagrams using mouse drag (pan) and scroll (zoom). Control icons are also provided.
-- **Split View**: Adjustable split view between the code editor and the diagram preview. Your layout preference is saved automatically using local storage.
-- **Shareable URLs**: Generate a unique URL containing your diagram code to share with others.
-- **File Save/Load**: Save your Mermaid code as a text file (`.txt`) and load it back later to continue working.
-- **Export Options**: Download your diagrams as high-quality PNG or JPG images (maintains original resolution).
+### Editor & Preview
+- **Real-time Rendering**: Diagrams update automatically as you type
+- **Enhanced Editor**: Code editor with line numbers for better readability
+- **Split View**: Adjustable resizable panels between code and preview (layout saved automatically)
+- **Zoom & Pan**: Navigate large diagrams with mouse controls or zoom buttons
+- **Background Patterns**: Toggle between dot and grid patterns for better visualization
 
-## How to Use
+### Error Handling & Feedback
+- **Detailed Error Messages**: Clear syntax error reporting in the preview area
+- **Visual Feedback**: Toast notifications for all actions
 
-1. Open `index.html` in your web browser (no server or build process required).
-2. Enter Mermaid diagram syntax in the left editor pane.
-3. The diagram will appear in the right pane.
-4. Use the buttons below the editor to:
-    - **Copy Share URL**: Copy a link to the current diagram to your clipboard.
-    - **Download PNG/JPG**: Save the diagram as an image file.
-5. Click "Need Help?" to view the official Mermaid documentation.
+### Save & Share
+- **Auto-Save**: Automatic local storage backup (1-hour expiration)
+- **Shareable URLs**: Generate encoded URLs to share diagrams
+- **File Operations**: Save/load Mermaid code as `.txt` or `.mmd` files
+- **Export Options**: Download as high-quality PNG or JPG images
 
-## Technologies Used
+### UI & Design
+- **Modern Interface**: Clean, gradient-based design with animated header
+- **Responsive Layout**: Works on desktop and mobile devices
+- **Sample Library**: 23 built-in diagram examples (flowchart, sequence, gantt, etc.)
+- **Customizable Gutter**: Stylish resizable split bar with hover effects
 
-- HTML5, CSS3, JavaScript (Vanilla)
-- [Mermaid.js](https://mermaid.js.org/) - Diagram generation
-- [Split.js](https://split.js.org/) - Resizable split views
-- [svg-pan-zoom](https://github.com/ariutta/svg-pan-zoom) - Pan and zoom capabilities for SVG
+## 🚀 How to Use
 
-## License
+1. Open `index.html` in your web browser (no build process required)
+2. Enter Mermaid diagram syntax in the left editor pane
+3. View the rendered diagram in real-time on the right
+4. Use toolbar buttons to:
+   - **Share**: Copy shareable URL to clipboard
+   - **Save/Load**: Export or import diagram code
+   - **Export**: Download as PNG or JPG image
+   - **Background**: Toggle between dot/grid patterns
+
+## 📚 Mermaid Syntax
+
+### Basic Example
+```mermaid
+graph TD
+    A[Start] --> B{Decision}
+    B -->|Yes| C[OK]
+    B -->|No| D[End]
+```
+
+### With Frontmatter (Theme & Config)
+```mermaid
+---
+title: My Diagram
+config:
+  theme: forest
+  themeVariables:
+    primaryColor: "#00ff00"
+---
+flowchart TD
+    A --> B
+```
+
+**Available Themes**: `default`, `forest`, `dark`, `neutral`, `base`
+
+For more syntax details, visit the [official Mermaid documentation](https://mermaid.js.org/syntax/flowchart.html).
+
+## 🛠️ Technologies Used
+
+- **Core**: HTML5, CSS3, Vanilla JavaScript
+- **Libraries**:
+  - [Mermaid.js](https://mermaid.js.org/) v11+ - Diagram rendering
+  - [Split.js](https://split.js.org/) 1.6.5 - Resizable panels
+  - [svg-pan-zoom](https://github.com/ariutta/svg-pan-zoom) 3.6.1 - SVG interaction
+
+## 📂 Project Structure
+
+```
+mermaid-editor/
+├── index.html          # Main HTML file
+├── style.css           # Styling and layout
+├── script.js           # Application logic
+├── README.md           # Documentation
+└── LICENSE             # MIT License
+```
+
+## 📋 Supported Diagram Types
+
+- Flowchart
+- Sequence Diagram
+- Class Diagram
+- State Diagram
+- Entity Relationship
+- User Journey
+- Gantt Chart
+- Pie Chart
+- Quadrant Chart
+- Requirement Diagram
+- GitGraph
+- C4 Diagram
+- Mindmaps
+- Timeline
+- Sankey
+- XY Chart
+- Block Diagram
+- Packet
+- Kanban
+- Architecture
+- Radar Chart
+- Treemap
+
+## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-
-## What's New (2025-11)
-
-- **대형 다이어그램 SVG로 자동 저장**: PNG/JPG로 저장 시 이미지 크기가 너무 크면 자동으로 SVG로 저장되며, 사용자에게 안내 메시지가 표시됩니다.
-- **Gantt 차트 todayMarker 자동 off**: Gantt 차트에서 todayMarker(오늘 표시선)가 자동으로 비활성화되어, 내보내기 시 불필요한 선이 포함되지 않습니다.
-- **창 크기 변경 시 다이어그램 리렌더링**: 브라우저 창 크기가 변경되면 다이어그램이 자동으로 다시 맞춰집니다.
-- **SVG 내보내기 개선**: 내보내는 SVG의 실제 보이는 영역만 정확히 포함되도록 개선되었습니다.
