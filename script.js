@@ -1059,21 +1059,35 @@ radar-beta
     // Background pattern toggle
     const applyBackground = (pattern) => {
         const isDark = document.body.classList.contains('dark-mode');
-        if (pattern === 'dot') {
-            const dotColor = isDark ? '#444' : '#d0d0d0';
-            mermaidDiagram.style.backgroundImage = `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`;
-            mermaidDiagram.style.backgroundSize = '20px 20px';
-            toggleBackgroundBtn.setAttribute('data-pattern', 'dot');
-        } else {
-            const lineColor = isDark ? '#444' : '#e0e0e0';
-            mermaidDiagram.style.backgroundImage = `linear-gradient(${lineColor} 1px, transparent 1px), linear-gradient(90deg, ${lineColor} 1px, transparent 1px)`;
-            mermaidDiagram.style.backgroundSize = '20px 20px';
-            toggleBackgroundBtn.setAttribute('data-pattern', 'grid');
+        switch (pattern) {
+            case 'dot': {
+                const dotColor = isDark ? '#444' : '#d0d0d0';
+                mermaidDiagram.style.backgroundImage = `radial-gradient(circle, ${dotColor} 1px, transparent 1px)`;
+                mermaidDiagram.style.backgroundSize = '20px 20px';
+                toggleBackgroundBtn.setAttribute('data-pattern', 'dot');
+                break;
+            }
+            case 'grid': {
+                const lineColor = isDark ? '#444' : '#e0e0e0';
+                mermaidDiagram.style.backgroundImage = `linear-gradient(${lineColor} 1px, transparent 1px), linear-gradient(90deg, ${lineColor} 1px, transparent 1px)`;
+                mermaidDiagram.style.backgroundSize = '20px 20px';
+                toggleBackgroundBtn.setAttribute('data-pattern', 'grid');
+                break;
+            }
+            case 'none':
+            default: {
+                mermaidDiagram.style.backgroundImage = 'none';
+                toggleBackgroundBtn.setAttribute('data-pattern', 'none');
+                break;
+            }
         }
     };
 
+    const backgroundCycle = ['dot', 'grid', 'none'];
     toggleBackgroundBtn.addEventListener('click', () => {
-        currentBackground = currentBackground === 'dot' ? 'grid' : 'dot';
+        const idx = backgroundCycle.indexOf(currentBackground);
+        const nextIdx = (idx + 1) % backgroundCycle.length;
+        currentBackground = backgroundCycle[nextIdx];
         localStorage.setItem(CONFIG.BACKGROUND_PATTERN_KEY, currentBackground);
         applyBackground(currentBackground);
     });

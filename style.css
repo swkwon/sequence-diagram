@@ -197,6 +197,16 @@ body.dark-mode .subtitle {
     transition: opacity var(--transition-base);
 }
 
+.pattern-toggle-btn .blank-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 16px;
+    height: 16px;
+    opacity: 0.2;
+    transition: opacity var(--transition-base);
+}
+
 .pattern-toggle-btn svg {
     display: block;
 }
@@ -207,6 +217,15 @@ body.dark-mode .subtitle {
 
 .pattern-toggle-btn[data-pattern="grid"] .grid-icon {
     opacity: 0.8;
+}
+
+.pattern-toggle-btn[data-pattern="none"] .dot-icon,
+.pattern-toggle-btn[data-pattern="none"] .grid-icon {
+    opacity: 0.15;
+}
+
+.pattern-toggle-btn[data-pattern="none"] .blank-icon {
+    opacity: 0.85;
 }
 
 /* Dark Mode Toggle States */
