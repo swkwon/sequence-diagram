@@ -1,4 +1,4 @@
-# Mermaid Editor
+# Mermaid Diagram Editor
 
 A modern, web-based tool for creating beautiful diagrams using [Mermaid.js](https://mermaid.js.org/).
 
@@ -22,7 +22,7 @@ A modern, web-based tool for creating beautiful diagrams using [Mermaid.js](http
 - **Keyboard Shortcuts**: 
   - `Ctrl + +/-/0`: Zoom in/out/reset
   - `Ctrl + i/k/j/l`: Pan diagram in all directions
-- **Background Patterns**: Toggle between dot and grid patterns for better visualization
+- **Background Patterns**: Single button cycles **dot → grid → none (blank)**; selection persists via localStorage for consistent visualization
 
 ### Save & Share
 - **Auto-Save**: Automatic local storage backup (1-hour expiration)
@@ -33,19 +33,6 @@ A modern, web-based tool for creating beautiful diagrams using [Mermaid.js](http
   - **Theme-aware Export**: Exported images match current theme (dark/light background)
 - **Clipboard Copy**: Copy diagram as image directly to clipboard for easy pasting into documents (works only on HTTPS or localhost)
   - **Theme-aware Copy**: Clipboard images preserve current theme colors
-
-### UI & Design
-- **Dark Mode**: Toggle between light and dark themes with persistent preference
-  - Automatic Mermaid diagram theme switching (default/dark)
-  - Adaptive background patterns that match the selected theme
-  - Smooth transitions between themes
-- **Full-Screen Layout**: Edge-to-edge design that maximizes workspace
-- **Modern Interface**: Clean, gradient-based design with animated header
-- **Optimized CSS**: CSS variables for consistent theming and easy customization
-- **Responsive Layout**: Works on desktop and mobile devices
-- **Sample Library**: 23 built-in diagram examples (flowchart, sequence, gantt, etc.)
-- **Customizable Gutter**: Stylish resizable split bar with hover effects
-- **Unified Toggle Buttons**: Consistent SVG-based icons for theme and pattern controls
 
 ## 🚀 How to Use
 
@@ -58,7 +45,7 @@ A modern, web-based tool for creating beautiful diagrams using [Mermaid.js](http
    - **Save/Load**: Export or import diagram code
    - **Export**: Click to open dropdown menu and select format (PNG, JPG, SVG, or PDF)
    - **Copy**: Copy diagram image directly to clipboard (works in modern browsers with HTTPS)
-   - **Background**: Toggle between dot/grid patterns
+  - **Background**: Click repeatedly to cycle dot → grid → none (blank)
    - **Zoom Controls**: Use buttons or keyboard shortcuts to zoom and pan
 
 For more syntax details, visit the [official Mermaid documentation](https://mermaid.js.org/syntax/flowchart.html).
